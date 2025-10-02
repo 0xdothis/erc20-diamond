@@ -16,7 +16,7 @@ module.exports = {
       accounts: [PRIVATE_KEY],
     },
     "base-sepolia": {
-      url: "https://proportionate-chaotic-waterfall.base-sepolia.quiknode.pro/307dd077a7b0383b16246ba590ad084ecdfa9ad2",
+      url: ALCHEMY_BASE_SEPOLIA,
       accounts: [ACIENTGURU_PRIVATE_KEY],
     },
   },

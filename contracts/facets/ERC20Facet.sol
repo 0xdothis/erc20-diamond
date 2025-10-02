@@ -1,57 +1,86 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../libraries/LibTokenStorage.sol";
+import {TokenStorage} from "../libraries/LibTokenStorage.sol";
 import "../interfaces/IERC20.sol";
 
 contract ERC20Facet is IERC20 {
-    ERC20Storage internal token;
+    function init(string memory name_, string memory symbol_, uint8 decimals_, uint256 supply_) external {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
+        require(bytes(token._name).length == 0, "Already initialized");
+
+        token._name = name_;
+        token._symbol = symbol_;
+        token._decimal = decimals_;
+        token._totalSupply = supply_ * (10 ** uint256(decimals_));
+        token._owner = msg.sender; // or _contractOwner
+        token._balances[msg.sender] = token._totalSupply;
+    }
 
     function name() public view returns (string memory) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         return token._name;
     }
 
     function symbol() public view returns (string memory) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         return token._symbol;
     }
 
     function decimals() public view returns (uint8) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         return token._decimal;
     }
 
     function totalSupply() public view override returns (uint256) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         return token._totalSupply;
     }
 
     function balanceOf(address account) public view override returns (uint256) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         return token._balances[account];
     }
 
     function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         address owner = token._owner;
         _transfer(owner, to, amount);
         return true;
     }
 
     function allowance(address owner, address spender) public view override returns (uint256) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         return token._allowances[owner][spender];
     }
 
     function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         address owner = token._owner;
         _approve(owner, spender, amount);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         address spender = token._owner;
         _spendAllowance(from, spender, amount);
         _transfer(from, to, amount);
         return true;
     }
 
-    function mint(address _account, uint256 _amount) public {
-        _mint(_account, _amount);
+    function mint(uint256 _amount) public {
+        _mint(_amount);
     }
 
     function burn(address _account, uint256 _amount) public {
@@ -59,12 +88,16 @@ contract ERC20Facet is IERC20 {
     }
 
     function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         address owner = token._owner;
         _approve(owner, spender, allowance(owner, spender) + addedValue);
         return true;
     }
 
     function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         address owner = token._owner;
         uint256 currentAllowance = allowance(owner, spender);
         require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
@@ -76,6 +109,8 @@ contract ERC20Facet is IERC20 {
     }
 
     function _transfer(address from, address to, uint256 amount) internal virtual {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
 
@@ -95,22 +130,24 @@ contract ERC20Facet is IERC20 {
         _afterTokenTransfer(from, to, amount);
     }
 
-    function _mint(address account, uint256 amount) internal virtual {
-        require(account != address(0), "ERC20: mint to the zero address");
+    function _mint(uint256 amount) internal virtual {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
 
-        _beforeTokenTransfer(address(0), account, amount);
+        _beforeTokenTransfer(address(0), msg.sender, amount);
 
         token._totalSupply += amount;
         unchecked {
             // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
-            token._balances[account] += amount;
+            token._balances[msg.sender] += amount;
         }
-        emit Transfer(address(0), account, amount);
+        emit Transfer(address(0), msg.sender, amount);
 
-        _afterTokenTransfer(address(0), account, amount);
+        _afterTokenTransfer(address(0), msg.sender, amount);
     }
 
     function _burn(address account, uint256 amount) internal virtual {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         require(account != address(0), "ERC20: burn from the zero address");
 
         _beforeTokenTransfer(account, address(0), amount);
@@ -129,6 +166,8 @@ contract ERC20Facet is IERC20 {
     }
 
     function _approve(address owner, address spender, uint256 amount) internal virtual {
+        TokenStorage.ERC20Storage storage token = TokenStorage.TOKENSTORAGE();
+
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 

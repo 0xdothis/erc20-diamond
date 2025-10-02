@@ -9,24 +9,12 @@ pragma solidity ^0.8.20;
  * Implementation of a diamond.
  * /*****************************************************************************
  */
-import {ERC20Storage} from "./libraries/LibTokenStorage.sol";
 import {LibDiamond} from "./libraries/LibDiamondStorage.sol";
 import {IDiamond} from "./interfaces/IDiamond.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 
 contract Diamond {
-    ERC20Storage internal token;
-
-    constructor(
-        address _contractOwner,
-        address _diamondCutFacet,
-        string memory tokenName,
-        string memory tokenSymbol,
-        uint8 tokenDecimal,
-        uint256 tokenSupply,
-        address facetAddress,
-        bytes memory constructData
-    ) payable {
+    constructor(address _contractOwner, address _diamondCutFacet) payable {
         LibDiamond.setContractOwner(_contractOwner);
 
         // Add the diamondCut external function from the diamondCutFacet
@@ -38,13 +26,7 @@ contract Diamond {
             action: IDiamond.FacetCutAction.Add,
             functionSelectors: functionSelectors
         });
-        LibDiamond.diamondCut(cut, facetAddress, constructData);
-
-        token._name = tokenName;
-        token._symbol = tokenSymbol;
-        token._decimal = tokenDecimal;
-        token._totalSupply = tokenSupply * tokenDecimal;
-        token._owner = _contractOwner;
+        LibDiamond.diamondCut(cut, address(0), "0x");
     }
 
     // Find facet for function that is called and execute the

@@ -1,7 +1,11 @@
 /* global ethers */
 /* eslint prefer-const: "off" */
 
-const { getSelectors, FacetCutAction } = require("./libraries/diamond.js");
+const {
+  getSelectors,
+  FacetCutAction,
+  remove,
+} = require("./libraries/diamond.js");
 
 async function verify(address, constructorArguments = []) {
   try {
@@ -24,34 +28,47 @@ async function deployDiamond() {
   const contractOwner = accounts[0];
 
   const DiamondCutFacet = await ethers.getContractFactory("DiamondCutFacet");
-  const diamondCutFacet = await DiamondCutFacet.deploy();
+  /** const diamondCutFacet = await DiamondCutFacet.deploy();
   await diamondCutFacet.waitForDeployment();
   const diamondCutAddress = await diamondCutFacet.getAddress();
   console.log("DiamondCutFacet deployed:", diamondCutAddress);
 
   await diamondCutFacet.deploymentTransaction().wait(2);
 
-  await verify(diamondCutAddress, []);
+  await verify(diamondCutAddress, []);*/
 
   // Deploy DiamondInit
-  const DiamondInit = await ethers.getContractFactory("DiamondInit");
-  const diamondInit = await DiamondInit.deploy();
+  /** const DiamondInit = await ethers.getContractAt("DiamondInit", );
+   const diamondInit = await DiamondInit.deploy();
   await diamondInit.waitForDeployment();
   const diamondInitAddress = await diamondInit.getAddress();
   console.log("DiamondInit deployed:", diamondInitAddress);
 
   await diamondInit.deploymentTransaction().wait(2);
 
-  await verify(diamondInitAddress, []);
+  await verify(diamondInitAddress, []);*/
 
   // deploy facets
   console.log("");
   console.log("Deploying facets");
-  const FacetNames = ["DiamondLoupeFacet", "OwnershipFacet", "ERC20Facet"];
+  const FacetNames = ["MultisigFacet", "SVGFacet", "SwapFacet"];
   const cut = [];
   for (const FacetName of FacetNames) {
+    let facet;
     const Facet = await ethers.getContractFactory(FacetName);
-    const facet = await Facet.deploy();
+    if (FacetName === "MultisigFacet") {
+      facet = await Facet.deploy(
+        [
+          "0xb5D045Ee46F26a6d9de59CcA670D6E8f35f206D0",
+          "0xE2cD6bBad217C1495B023dBa35b40236280Dc356",
+          "0x5eCA53C4D237C0C05B6a670041e63ab15b7DC104",
+        ],
+        3,
+      );
+    } else {
+      facet = await Facet.deploy();
+    }
+
     await facet.waitForDeployment();
     const facetCA = await facet.getAddress();
     console.log(`${FacetName} deployed: ${facetCA}`);
@@ -61,23 +78,25 @@ async function deployDiamond() {
       action: FacetCutAction.Add,
       functionSelectors: getSelectors(facet),
     });
-
-    await facet.deploymentTransaction().wait(2);
-
-    await verify(facetCA, []);
+    if (FacetName === "MultisigFacet") {
+      await verify(facetCA, [
+        [
+          "0xb5D045Ee46F26a6d9de59CcA670D6E8f35f206D0",
+          "0xE2cD6bBad217C1495B023dBa35b40236280Dc356",
+          "0x5eCA53C4D237C0C05B6a670041e63ab15b7DC104",
+        ],
+        3,
+      ]);
+    } else {
+      await verify(facetCA, []);
+    }
   }
 
   // deploy Diamond and Mint using delegatecall in the Diamond.sol constructor
-  const Diamond = await ethers.getContractFactory("Diamond");
+  /** const Diamond = await ethers.getContractFactory("Diamond");
   const diamond = await Diamond.deploy(
     contractOwner.address,
     diamondCutAddress,
-    "SIMPLE TOKEN",
-    "STK",
-    18,
-    10000000,
-    cut[2].facetAddress,
-    "0x40c10f19000000000000000000000000e2cd6bbad217c1495b023dba35b40236280dc3560000000000000000000000000000000000000000000000000000000000989680",
   );
   await diamond.waitForDeployment();
   const diamondCA = await diamond.getAddress();
@@ -85,36 +104,54 @@ async function deployDiamond() {
 
   await diamond.deploymentTransaction().wait(2);
 
-  await verify(diamondCA, [
-    contractOwner.address,
-    diamondCutAddress,
-    "SIMPLE TOKEN",
-    "STK",
-    18,
-    10000000,
-    cut[2].facetAddress,
-    "0x40c10f19000000000000000000000000e2cd6bbad217c1495b023dba35b40236280dc3560000000000000000000000000000000000000000000000000000000000989680",
+  await verify(diamondCA, [contractOwner.address, diamondCutAddress]);
+
+  // ✅ Encode ERC20Facet initializer call
+  const ERC20Facet = await ethers.getContractFactory("ERC20Facet");
+  const initCalldata = ERC20Facet.interface.encodeFunctionData("init", [
+    "SIMPLE TOKEN", // name
+    "STK", // symbol
+    18, // decimals
+    ethers.parseUnits("10000000", 18), // supply (10,000,000 * 10^18)
   ]);
+*/
 
   // upgrade diamond with facets
   console.log("");
   console.log("Diamond Cut:", cut);
-  const diamondCut = await ethers.getContractAt("IDiamondCut", diamondCA);
-  let tx;
-  let receipt;
+  const diamondInit = await ethers.getContractAt(
+    "DiamondInit",
+    "0x5681006AF9deb0D2FC498732C25370a1b91a960C",
+  );
+  const diamondCut = await ethers.getContractAt(
+    "IDiamondCut",
+    "0x0fB7c2404dA9f2d5955c4894e0BbEfc0CDF5D5B1",
+  );
+
+  let tx, tx2;
+  let receipt, receipt2;
   // call to init function
   let functionCall = diamondInit.interface.encodeFunctionData("init");
-  tx = await diamondCut.diamondCut(cut, diamondInitAddress, functionCall);
+  tx = await diamondCut.diamondCut(
+    cut,
+    "0x5681006AF9deb0D2FC498732C25370a1b91a960C",
+    functionCall,
+  );
+  //tx2 = await diamondCut.diamondCut([], cut[2].facetAddress, initCalldata);
   console.log("Diamond cut tx: ", tx.hash);
   receipt = await tx.wait();
-  if (!receipt.status) {
+  //receipt2 = await tx2.wait();
+  if (!receipt.status /**|| /!receipt2.status*/) {
     throw Error(`Diamond upgrade failed: ${tx.hash}`);
   }
   console.log("Completed diamond cut");
   // return diamond.address
 }
 
-// We recommend this pattern to be able to use async/await everywhere
+//Revome mint function
+/**console.log("");
+console.log("Removing function");*/
+
 // and properly handle errors.
 if (require.main === module) {
   deployDiamond()
